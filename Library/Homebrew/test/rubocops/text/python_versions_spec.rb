@@ -228,7 +228,7 @@ RSpec.describe RuboCop::Cop::FormulaAudit::PythonVersions do
 
           def install
             python = "python3.12"
-                     ^^^^^^^^^^^^ FormulaAudit/PythonVersions: `python = "pythonX.Y"` should use dynamic version detection: `python = "python#{python_major_minor(libexec/"bin/python)")}"`
+                     ^^^^^^^^^^^^ FormulaAudit/PythonVersions: `python = "pythonX.Y"` should use dynamic version detection: `python = "python#{Formula.python_major_minor_version(libexec/"bin/python")}"`
           end
         end
       RUBY
@@ -238,7 +238,7 @@ RSpec.describe RuboCop::Cop::FormulaAudit::PythonVersions do
           depends_on "python@3.14"
 
           def install
-            python = "python#{python_major_minor(libexec/"bin/python)")}"
+            python = "python#{Formula.python_major_minor_version(libexec/"bin/python")}"
           end
         end
       RUBY
@@ -250,7 +250,7 @@ RSpec.describe RuboCop::Cop::FormulaAudit::PythonVersions do
           depends_on "python@3.14"
 
           def install
-            python = "python#{python_major_minor(libexec/"bin/python)")}"
+            python = "python#{Formula.python_major_minor_version(libexec/"bin/python")}"
           end
         end
       RUBY
@@ -263,7 +263,7 @@ RSpec.describe RuboCop::Cop::FormulaAudit::PythonVersions do
 
           def install
             python3 = "python3.12"
-                      ^^^^^^^^^^^^ FormulaAudit/PythonVersions: `python = "pythonX.Y"` should use dynamic version detection: `python = "python#{python_major_minor(libexec/"bin/python)")}"`
+                      ^^^^^^^^^^^^ FormulaAudit/PythonVersions: `python = "pythonX.Y"` should use dynamic version detection: `python = "python#{Formula.python_major_minor_version(libexec/"bin/python")}"`
           end
         end
       RUBY
@@ -273,7 +273,30 @@ RSpec.describe RuboCop::Cop::FormulaAudit::PythonVersions do
           depends_on "python@3.14"
 
           def install
-            python3 = "python#{python_major_minor(libexec/"bin/python)")}"
+            python3 = "python#{Formula.python_major_minor_version(libexec/"bin/python")}"
+          end
+        end
+      RUBY
+    end
+
+    it "reports and corrects a hardcoded version matching the python dependency" do
+      expect_offense(<<~'RUBY')
+        class Foo < Formula
+          depends_on "python@3.14"
+
+          def install
+            python = "python3.14"
+                     ^^^^^^^^^^^^ FormulaAudit/PythonVersions: `python = "pythonX.Y"` should use dynamic version detection: `python = "python#{Formula.python_major_minor_version(libexec/"bin/python")}"`
+          end
+        end
+      RUBY
+
+      expect_correction(<<~'RUBY')
+        class Foo < Formula
+          depends_on "python@3.14"
+
+          def install
+            python = "python#{Formula.python_major_minor_version(libexec/"bin/python")}"
           end
         end
       RUBY

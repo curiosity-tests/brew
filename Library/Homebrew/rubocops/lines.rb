@@ -585,7 +585,7 @@ module RuboCop
 
         HARDCODED_PYTHON_ASSIGNMENT_MSG =
           "`python = \"pythonX.Y\"` should use dynamic version detection: " \
-          "`python = \"python\#{python_major_minor(libexec/\"bin/python)\")}\"`"
+          "`python = \"python\#{Formula.python_major_minor_version(libexec/\"bin/python\")}\"`"
 
         sig { override.params(formula_nodes: FormulaNodes).void }
         def audit_formula(formula_nodes)
@@ -603,7 +603,7 @@ module RuboCop
             problem HARDCODED_PYTHON_ASSIGNMENT_MSG do |corrector|
               corrector.replace(
                 value.source_range,
-                "\"python\#{python_major_minor(libexec/\"bin/python)\")}\"",
+                "\"python\#{Formula.python_major_minor_version(libexec/\"bin/python\")}\"",
               )
             end
           end
