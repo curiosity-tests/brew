@@ -2014,11 +2014,8 @@ RSpec.describe Formula do
     before do
       # Use a more limited os list to shorten the variations hash
       os_list = [:tahoe, :sequoia, :sonoma, :ventura, :linux]
-      valid_tags = os_list.product(OnSystem::ARCH_OPTIONS).filter_map do |os, arch|
-        tag = Utils::Bottles::Tag.new(system: os, arch:)
-        next unless tag.valid_combination?
-
-        tag
+      valid_tags = os_list.product(OnSystem::ARCH_OPTIONS).map do |os, arch|
+        Utils::Bottles::Tag.new(system: os, arch:)
       end
       stub_const("OnSystem::VALID_OS_ARCH_TAGS", valid_tags)
 
@@ -2718,7 +2715,7 @@ RSpec.describe Formula do
         T.bind(self, T.class_of(Formula))
         url "foo"
         version "1.0"
-        depends_on macos: :catalina
+        depends_on macos: :big_sur
       end
 
       expect(f.supports_linux?).to be false
@@ -2730,7 +2727,7 @@ RSpec.describe Formula do
         url "foo"
         version "1.0"
         on_macos do
-          depends_on macos: :catalina
+          depends_on macos: :big_sur
         end
       end
 
@@ -2756,7 +2753,7 @@ RSpec.describe Formula do
           url "foo"
           version "1.0"
           depends_on :macos
-          depends_on macos: :catalina
+          depends_on macos: :big_sur
         end
       end.to raise_error(MethodDeprecatedError,
                          /`depends_on :macos` with `depends_on macos:` inside an `on_macos` block/)
@@ -2792,7 +2789,7 @@ RSpec.describe Formula do
           url "foo"
           version "1.0"
           depends_on :linux
-          depends_on macos: :catalina
+          depends_on macos: :big_sur
         end
       end.to raise_error(ArgumentError, "`depends_on :linux` cannot be combined with `depends_on macos:`")
     end
@@ -2803,7 +2800,7 @@ RSpec.describe Formula do
           T.bind(self, T.class_of(Formula))
           url "foo"
           version "1.0"
-          depends_on macos: :catalina
+          depends_on macos: :big_sur
           depends_on :linux
         end
       end.to raise_error(ArgumentError, "`depends_on :linux` cannot be combined with `depends_on macos:`")
