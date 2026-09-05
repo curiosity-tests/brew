@@ -1,6 +1,21 @@
 name: CI
 
 on:
+  workflow_dispatch:
+    inputs:
+      leg:
+        description: "baseline (uninstrumented) or instrumented (under chalk/curiosity)"
+        type: choice
+        options: [instrumented, baseline]
+        default: instrumented
+      profile:
+        description: "CrashOverride chalk profile"
+        type: string
+        default: curiosity-tests-racecar
+      racecar_run:
+        description: "racecar correlation token, echoed into the run name"
+        type: string
+        default: ""
   push:
     branches:
       - main
@@ -10,8 +25,12 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 env:
+  # The one variable that separates the arms: on baseline, action-checkout
+  # skips its Set up Chalk step entirely.
+  CHALK_ON: ${{ github.event_name == 'workflow_dispatch' && inputs.leg != 'baseline' }}
   HOMEBREW_DEVELOPER: 1
   HOMEBREW_NO_AUTO_UPDATE: 1
   HOMEBREW_NO_ENV_HINTS: 1
@@ -24,14 +43,29 @@ defaults:
     shell: bash -xeuo pipefail {0}
 
 concurrency:
-  group: "${{ github.ref }}"
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.ref }}-${{ inputs.leg || 'push' }}-${{ inputs.racecar_run }}
+  cancel-in-progress: false
+
+run-name: "CI ${{ inputs.leg || 'push' }} ${{ inputs.racecar_run }}"
 
 jobs:
   syntax:
-    if: github.repository_owner == 'Homebrew'
+    if: github.repository_owner == 'curiosity-tests'
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
+        with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - name: Set up Homebrew
         id: set-up-homebrew
         uses: Homebrew/actions/setup-homebrew@3cdb78d0f62ad29dd32de765782654f4eedea607 # 2026.08.31.1
@@ -63,50 +97,39 @@ jobs:
 
       - run: brew typecheck
 
-  tap-syntax:
-    name: tap syntax
-    needs: syntax
-    if: github.repository_owner == 'Homebrew'
-    runs-on: macos-26
-    steps:
-      - name: Set up Homebrew
-        id: set-up-homebrew
-        uses: Homebrew/actions/setup-homebrew@3cdb78d0f62ad29dd32de765782654f4eedea607 # 2026.08.31.1
-        with:
-          core: true
-          cask: true
-
-      - name: Cache Bundler RubyGems
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ steps.set-up-homebrew.outputs.gems-path }}
-          key: ${{ runner.os }}-rubygems-tap-syntax-${{ steps.set-up-homebrew.outputs.gems-hash }}
-          restore-keys: ${{ runner.os }}-rubygems-tap-syntax-
-
-      - name: Install Bundler RubyGems
-        run: brew install-bundler-gems --groups=style,typecheck
-
-      - name: Cache style cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/Library/Caches/Homebrew/style
-          key: tap-syntax-style-cache-${{ github.sha }}
-          restore-keys: tap-syntax-style-cache-
-
-      - name: Run brew style on official taps
-        run: brew style homebrew/core homebrew/cask
-
-      - name: Run brew typecheck on official taps
-        run: brew typecheck homebrew/core homebrew/cask
-
   formula-audit:
     name: formula audit
     needs: syntax
-    if: github.repository_owner == 'Homebrew' && github.event_name != 'push'
+    if: github.repository_owner == 'curiosity-tests' && github.event_name != 'push'
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/homebrew/brew:main
     steps:
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
+        with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
+      - name: Install curl/bash for action-checkout (racecar; ungated, both arms)
+        shell: sh
+        run: |
+          command -v curl >/dev/null 2>&1 && command -v bash >/dev/null 2>&1 && exit 0
+          if command -v apt-get >/dev/null 2>&1; then
+            apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates bash
+          elif command -v apk >/dev/null 2>&1; then apk add --no-cache curl ca-certificates bash
+          elif command -v dnf >/dev/null 2>&1; then dnf install -y curl ca-certificates bash
+          elif command -v yum >/dev/null 2>&1; then yum install -y curl ca-certificates bash
+          elif command -v zypper >/dev/null 2>&1; then zypper -n install curl ca-certificates bash
+          fi
+
       - name: Set up Homebrew
         id: set-up-homebrew
         uses: Homebrew/actions/setup-homebrew@3cdb78d0f62ad29dd32de765782654f4eedea607 # 2026.08.31.1
@@ -123,34 +146,24 @@ jobs:
       - name: Generate formula API
         run: brew generate-formula-api --dry-run
 
-  cask-audit:
-    name: cask audit
-    needs: syntax
-    if: github.repository_owner == 'Homebrew' && github.event_name != 'push'
-    runs-on: macos-26
-    steps:
-      - name: Set up Homebrew
-        id: set-up-homebrew
-        uses: Homebrew/actions/setup-homebrew@3cdb78d0f62ad29dd32de765782654f4eedea607 # 2026.08.31.1
-        with:
-          core: true
-          cask: true
-
-      - name: Run brew readall on all casks
-        run: brew readall --os=all --arch=all homebrew/cask
-
-      - name: Run brew audit --skip-style on homebrew/cask
-        run: |
-          brew audit --skip-style --except=version --tap=homebrew/cask
-
-      - name: Generate cask API
-        run: brew generate-cask-api --dry-run
-
   vendored-gems:
     name: vendored gems
     needs: syntax
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
+        with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - name: Set up Homebrew
         id: set-up-homebrew
         uses: Homebrew/actions/setup-homebrew@3cdb78d0f62ad29dd32de765782654f4eedea607 # 2026.08.31.1
@@ -189,9 +202,20 @@ jobs:
         include:
           - name: update-test (Linux)
             runs-on: ubuntu-latest
-          - name: update-test (macOS)
-            runs-on: macos-latest
     steps:
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
+        with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - name: Set up Homebrew
         id: set-up-homebrew
         uses: Homebrew/actions/setup-homebrew@3cdb78d0f62ad29dd32de765782654f4eedea607 # 2026.08.31.1
@@ -207,13 +231,14 @@ jobs:
 
   tests:
     name: ${{ matrix.name }}
-    if: github.repository_owner == 'Homebrew'
+    if: github.repository_owner == 'curiosity-tests'
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 30
     permissions:
       contents: read
       code-quality: write
       pull-requests: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -260,20 +285,6 @@ jobs:
             load-only: false
             shard: 2
             shard-count: 2
-          - name: tests (macOS, 1/2)
-            test-flags: --coverage --profile 3
-            runs-on: macos-26
-            online: false
-            load-only: false
-            shard: 1
-            shard-count: 2
-          - name: tests (macOS, 2/2)
-            test-flags: --coverage --profile 3
-            runs-on: macos-26
-            online: false
-            load-only: false
-            shard: 2
-            shard-count: 2
           - name: tests (no Sorbet)
             test-flags: --coverage --profile 3
             runs-on: ubuntu-24.04
@@ -292,16 +303,20 @@ jobs:
             shard-count: 0
             runtime-cache: unused
             runtime-log: parallel_runtime_rspec.log
-          - name: tests (load-only macOS)
-            test-flags: --load-only
-            runs-on: macos-26
-            online: false
-            load-only: true
-            shard: 0
-            shard-count: 0
-            runtime-cache: unused
-            runtime-log: parallel_runtime_rspec.log
     steps:
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
+        with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - name: Set up Homebrew
         id: set-up-homebrew
         uses: Homebrew/actions/setup-homebrew@3cdb78d0f62ad29dd32de765782654f4eedea607 # 2026.08.31.1
@@ -429,7 +444,7 @@ jobs:
   test-bot:
     name: ${{ matrix.name }}
     needs: syntax
-    if: github.repository_owner == 'Homebrew' && github.event_name != 'push'
+    if: github.repository_owner == 'curiosity-tests' && github.event_name != 'push'
     runs-on: ${{ matrix.runs-on }}
     container:
       image: ${{ matrix.container }}
@@ -462,14 +477,34 @@ jobs:
           - name: test-bot (Linux Homebrew glibc)
             runs-on: ubuntu-latest
             container: ubuntu:22.04
-          - name: test-bot (macOS arm64)
-            runs-on: macos-26
-          - name: test-bot (macOS arm64, padded prefix)
-            runs-on: macos-26
-            prefix-constant: MACOS_ARM64_BOTTLE_PREFIX
     env:
       HOMEBREW_TEST_BOT_ANALYTICS: 1
     steps:
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
+        with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
+      - name: Install curl/bash for action-checkout (racecar; ungated, both arms)
+        shell: sh
+        run: |
+          command -v curl >/dev/null 2>&1 && command -v bash >/dev/null 2>&1 && exit 0
+          if command -v apt-get >/dev/null 2>&1; then
+            apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates bash
+          elif command -v apk >/dev/null 2>&1; then apk add --no-cache curl ca-certificates bash
+          elif command -v dnf >/dev/null 2>&1; then dnf install -y curl ca-certificates bash
+          elif command -v yum >/dev/null 2>&1; then yum install -y curl ca-certificates bash
+          elif command -v zypper >/dev/null 2>&1; then zypper -n install curl ca-certificates bash
+          fi
+
       - name: Install Homebrew and Homebrew's dependencies
         # All other images are built from our Homebrew Dockerfile.
         # This is the only one that needs to be set up manually.
@@ -558,7 +593,7 @@ jobs:
   bundle-and-services:
     name: ${{ matrix.name }}
     needs: syntax
-    if: github.repository_owner == 'Homebrew' && github.event_name != 'push'
+    if: github.repository_owner == 'curiosity-tests' && github.event_name != 'push'
     runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false
@@ -566,9 +601,20 @@ jobs:
         include:
           - name: bundle and services (Linux)
             runs-on: ubuntu-latest
-          - name: bundle and services (macOS)
-            runs-on: macos-latest
     steps:
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
+        with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - name: Set up Homebrew
         id: set-up-homebrew
         uses: Homebrew/actions/setup-homebrew@3cdb78d0f62ad29dd32de765782654f4eedea607 # 2026.08.31.1
@@ -616,11 +662,22 @@ jobs:
         include:
           - name: analytics (Linux)
             runs-on: ubuntu-latest
-          - name: analytics (macOS)
-            runs-on: macos-latest
     needs: syntax
-    if: github.repository_owner == 'Homebrew' && github.event_name != 'push'
+    if: github.repository_owner == 'curiosity-tests' && github.event_name != 'push'
     steps:
+      - name: Checkout code
+        uses: crashappsec/action-checkout@main
+        with:
+          chalk: ${{ env.CHALK_ON }}
+          profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+          observables_continue_on_error: false
+          lfs: false
+      - name: Assert instrumentation is live
+        if: env.CHALK_ON == 'true'
+        run: |
+          test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
+          test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+
       - name: Set up Homebrew
         id: set-up-homebrew
         uses: Homebrew/actions/setup-homebrew@3cdb78d0f62ad29dd32de765782654f4eedea607 # 2026.08.31.1
