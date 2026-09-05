@@ -963,7 +963,7 @@ module Homebrew
         return if stable_url_minor_version.even?
 
         problem "Stable: version (#{stable.version}) is a development release"
-      when %r{isc.org/isc/bind\d*/}i
+      when %r{isc\.org/isc/bind\d*/}i
         return if stable_url_minor_version.even?
 
         problem "Stable: version (#{stable.version}) is a development release"
@@ -980,7 +980,7 @@ module Homebrew
           error = SharedAudits.gitlab_release(owner, repo, tag, formula:)
           problem error if error
         end
-      when %r{^https://github.com/([\w-]+)/([\w-]+)}
+      when %r{^https://github\.com/([\w-]+)/([\w-]+)}
         owner = T.must(Regexp.last_match(1))
         repo = T.must(Regexp.last_match(2))
         tag = SharedAudits.github_tag_from_url(url)
