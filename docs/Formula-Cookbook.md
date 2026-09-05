@@ -799,7 +799,7 @@ Homebrew offers these anonymous download strategies.
 
 | `using:` value   | download strategy                | requirements |
 | ---------------- | -------------------------------- | ------------ |
-| `:bzr`           | fetch from Bazaar repository     | `breezy` installed |
+| `:bzr`           | fetch from Bazaar repository (deprecated) | migrate to `:git` or a stable archive URL |
 | `:curl`          | download using `curl` (default)  | |
 | `:cvs`           | fetch from CVS repository        | `cvs` installed |
 | `:fossil`        | fetch from Fossil repository     | `fossil` installed |
