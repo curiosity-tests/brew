@@ -35,6 +35,7 @@ module OS
 
       sig { void }
       def libxml2
+        odeprecated "ENV.libxml2", "`pkg-config` or explicit include paths"
         append "CPPFLAGS", "-I#{::Formula["libxml2"].include/"libxml2"}"
       rescue FormulaUnavailableError
         nil

@@ -105,9 +105,10 @@ module OS
       end
 
       # Some configure scripts won't find libxml2 without help.
-      # This is a no-op with macOS SDK 10.15.4 and later.
+      # This is a no-op with all supported macOS SDKs.
       sig { void }
       def libxml2
+        odeprecated "ENV.libxml2", "`pkg-config` or explicit include paths"
         sdk = self["SDKROOT"] || MacOS.sdk_path
         # Use the includes from the sdk
         append "CPPFLAGS", "-I#{sdk}/usr/include/libxml2" unless Pathname("#{sdk}/usr/include/libxml").directory?
