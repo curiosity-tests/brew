@@ -236,7 +236,7 @@ module RuboCop
             first_param, second_param = parameters(method)
             next if !node_equals?(first_param, "npm") ||
                     !node_equals?(second_param, "install") ||
-                    method.source.match(/(std_npm_args|local_npm_install_args|std_npm_install_args)/)
+                    method.source.match(/(?:std_npm_args|local_npm_install_args|std_npm_install_args)/)
 
             offending_node(method)
             problem "Use `std_npm_args` for npm install"
@@ -815,12 +815,12 @@ module RuboCop
           @offensive_node = offenses.fetch(-1)
           replacement = if (%w[:bash :zsh :fish] - shells).empty?
             @offensive_node.source
-                           .sub(/shells: \[(:bash|:zsh|:fish)\]/, "")
+                           .sub(/shells: \[(?::bash|:zsh|:fish)\]/, "")
                            .sub(", )", ")") # clean up dangling trailing comma
                            .sub("(, ", "(") # clean up dangling leading comma
                            .sub(", , ", ", ") # clean up dangling enclosed comma
           else
-            @offensive_node.source.sub(/shells: \[(:bash|:zsh|:fish)\]/,
+            @offensive_node.source.sub(/shells: \[(?::bash|:zsh|:fish)\]/,
                                        "shells: [#{shells.join(", ")}]")
           end
 
@@ -914,19 +914,19 @@ module RuboCop
           # Avoid hard-coding compilers
           find_every_method_call_by_name(body_node, :system).each do |method|
             param = parameters(method).fetch(0)
-            if (match = regex_match_group(param, %r{^(/usr/bin/)?(gcc|clang|cc|c[89]9)(\s|$)}))
-              problem "Use `\#{ENV.cc}` instead of hard-coding `#{match[2]}`"
-            elsif (match = regex_match_group(param, %r{^(/usr/bin/)?((g|clang|c)\+\+)(\s|$)}))
-              problem "Use `\#{ENV.cxx}` instead of hard-coding `#{match[2]}`"
+            if (match = regex_match_group(param, %r{^(?:/usr/bin/)?(gcc|clang|cc|c[89]9)(?:\s|$)}))
+              problem "Use `\#{ENV.cc}` instead of hard-coding `#{match[1]}`"
+            elsif (match = regex_match_group(param, %r{^(?:/usr/bin/)?((?:g|clang|c)\+\+)(?:\s|$)}))
+              problem "Use `\#{ENV.cxx}` instead of hard-coding `#{match[1]}`"
             end
           end
 
           find_instance_method_call(body_node, "ENV", :[]=) do |method|
             param = parameters(method).fetch(1)
-            if (match = regex_match_group(param, %r{^(/usr/bin/)?(gcc|clang|cc|c[89]9)(\s|$)}))
-              problem "Use `\#{ENV.cc}` instead of hard-coding `#{match[2]}`"
-            elsif (match = regex_match_group(param, %r{^(/usr/bin/)?((g|clang|c)\+\+)(\s|$)}))
-              problem "Use `\#{ENV.cxx}` instead of hard-coding `#{match[2]}`"
+            if (match = regex_match_group(param, %r{^(?:/usr/bin/)?(gcc|clang|cc|c[89]9)(?:\s|$)}))
+              problem "Use `\#{ENV.cc}` instead of hard-coding `#{match[1]}`"
+            elsif (match = regex_match_group(param, %r{^(?:/usr/bin/)?((?:g|clang|c)\+\+)(?:\s|$)}))
+              problem "Use `\#{ENV.cxx}` instead of hard-coding `#{match[1]}`"
             end
           end
 
@@ -941,8 +941,8 @@ module RuboCop
             if (match = regex_match_group(p, %r{^(/share/(info|man))$}))
               problem ["`#", "{prefix}", match[1], '` should be `#{', match[2], "}`"].join
             end
-            if (match = regex_match_group(p, %r{^((/share/man/)(man[1-8]))}))
-              problem ["`#", "{prefix}", match[1], '` should be `#{', match[3], "}`"].join
+            if (match = regex_match_group(p, %r{^((?:/share/man/)(man[1-8]))}))
+              problem ["`#", "{prefix}", match[1], '` should be `#{', match[2], "}`"].join
             end
             if (match = regex_match_group(p, %r{^(/(bin|include|libexec|lib|sbin|share|Frameworks))}i))
               # match[2] must exist because of the previous line
@@ -953,13 +953,13 @@ module RuboCop
           find_every_method_call_by_name(body_node, :depends_on).each do |method|
             key, value = destructure_hash(parameters(method).fetch(0))
             next if key.nil? || value.nil?
-            next unless (match = regex_match_group(value, /^(lua|perl|python|ruby)(\d*)/))
+            next unless (match = regex_match_group(value, /^(lua|perl|python|ruby)(?:\d*)/))
 
             problem "#{match[1]} modules should be vendored rather than using deprecated `#{method.source}`"
           end
 
           find_every_method_call_by_name(body_node, :system).each do |method|
-            next unless (match = regex_match_group(parameters(method).fetch(0), /^(env|export)(\s+)?/))
+            next unless (match = regex_match_group(parameters(method).fetch(0), /^(env|export)\s*/))
 
             problem "Use `ENV` instead of invoking `#{match[1]}` to modify the environment"
           end
@@ -971,7 +971,7 @@ module RuboCop
 
             option_child_nodes.each do |option|
               find_strings(option).each do |dependency|
-                next unless (match = regex_match_group(dependency, /(with(out)?-\w+|c\+\+11)/))
+                next unless (match = regex_match_group(dependency, /(?:with(?:out)?-\w+|c\+\+11)/))
 
                 problem "Dependency '#{string_content(dep)}' should not use option `#{match[0]}`"
               end
@@ -1019,7 +1019,7 @@ module RuboCop
             problem "`fails_with :llvm` is now a no-op and should be removed"
           end
 
-          find_method_with_args(body_node, :system, /^(otool|install_name_tool|lipo)/) do
+          find_method_with_args(body_node, :system, /^(?:otool|install_name_tool|lipo)/) do
             problem "Use ruby-macho instead of calling #{T.must(@offensive_node).source}"
           end
 
@@ -1127,7 +1127,7 @@ module RuboCop
             next unless node_equals?(params[0], "make")
 
             params[1..]&.each do |arg|
-              next unless regex_match_group(arg, /^(checks?|tests?)$/)
+              next unless regex_match_group(arg, /^(?:checks?|tests?)$/)
 
               @offensive_node = method
               problem "Formulae in homebrew/core (except e.g. cryptography, libraries) " \

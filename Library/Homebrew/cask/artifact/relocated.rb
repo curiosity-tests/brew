@@ -114,7 +114,7 @@ module Cask
 
       sig { returns(String) }
       def printable_target
-        target.to_s.sub(/^#{Dir.home}(#{File::SEPARATOR}|$)/, "~/")
+        target.to_s.sub(/^#{Dir.home}(?:#{File::SEPARATOR}|$)/, "~/")
       end
     end
   end

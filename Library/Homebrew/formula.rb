@@ -3618,7 +3618,7 @@ class Formula
         pretty_args -= std_meson_args
       when "zig"
         pretty_args -= std_zig_args
-      when %r{(^|/)(pip|python)(?:[23](?:\.\d{1,2})?)?$}
+      when %r{(?:^|/)(?:pip|python)(?:[23](?:\.\d{1,2})?)?$}
         pretty_args -= std_pip_args
       end
     end
