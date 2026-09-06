@@ -30,7 +30,7 @@ permissions:
 env:
   # The one variable that separates the arms: on baseline, action-checkout
   # skips its Set up Chalk step entirely.
-  CHALK_ON: ${{ github.event_name == 'workflow_dispatch' && inputs.leg != 'baseline' }}
+  CHALK_ON: ${{ inputs.leg == 'instrumented' }}
   HOMEBREW_DEVELOPER: 1
   HOMEBREW_NO_AUTO_UPDATE: 1
   HOMEBREW_NO_ENV_HINTS: 1
@@ -100,7 +100,7 @@ jobs:
   formula-audit:
     name: formula audit
     needs: syntax
-    if: github.repository_owner == 'curiosity-tests' && github.event_name != 'push'
+    if: github.repository_owner == 'curiosity-tests' && 'push' != 'push'
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/homebrew/brew:main
@@ -195,7 +195,7 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runs-on }}
     needs: syntax
-    if: github.event_name != 'push'
+    if: ${{ 'push' != 'push' }}
     strategy:
       fail-fast: false
       matrix:
@@ -385,7 +385,7 @@ jobs:
         run: echo "HOMEBREW_TESTS_NO_SORBET_RUNTIME=1" >> "$GITHUB_ENV"
 
       - name: Run brew tests
-        if: github.event_name == 'pull_request' || matrix.online != true
+        if: ${{ 'push' == 'pull_request' || matrix.online != true }}
         run: |
           read -ra test_flags <<< "$TEST_FLAGS"
           if (( SHARD_COUNT > 0 )); then
@@ -425,7 +425,7 @@ jobs:
           echo "filenames=${filenames%,}" >> "$GITHUB_OUTPUT"
 
       - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
-        if: matrix.load-only != true && (github.event_name == 'pull_request' || matrix.online != true)
+        if: matrix.load-only != true && ('push' == 'pull_request' || matrix.online != true)
         with:
           working-directory: ${{ steps.set-up-homebrew.outputs.repository-path }}
           files: ${{ steps.junit_xml.outputs.filenames }}
@@ -434,7 +434,7 @@ jobs:
           report_type: test_results
 
       - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
-        if: matrix.load-only != true && (github.event_name == 'pull_request' || matrix.online != true)
+        if: matrix.load-only != true && ('push' == 'pull_request' || matrix.online != true)
         with:
           working-directory: ${{ steps.set-up-homebrew.outputs.repository-path }}
           files: Library/Homebrew/test/coverage/coverage.xml
@@ -444,7 +444,7 @@ jobs:
   test-bot:
     name: ${{ matrix.name }}
     needs: syntax
-    if: github.repository_owner == 'curiosity-tests' && github.event_name != 'push'
+    if: github.repository_owner == 'curiosity-tests' && 'push' != 'push'
     runs-on: ${{ matrix.runs-on }}
     container:
       image: ${{ matrix.container }}
@@ -593,7 +593,7 @@ jobs:
   bundle-and-services:
     name: ${{ matrix.name }}
     needs: syntax
-    if: github.repository_owner == 'curiosity-tests' && github.event_name != 'push'
+    if: github.repository_owner == 'curiosity-tests' && 'push' != 'push'
     runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false
@@ -663,7 +663,7 @@ jobs:
           - name: analytics (Linux)
             runs-on: ubuntu-latest
     needs: syntax
-    if: github.repository_owner == 'curiosity-tests' && github.event_name != 'push'
+    if: github.repository_owner == 'curiosity-tests' && 'push' != 'push'
     steps:
       - name: Checkout code
         uses: crashappsec/action-checkout@main
@@ -700,11 +700,11 @@ jobs:
       - run: brew formula-analytics --setup
 
       - run: brew formula-analytics --install --json --days-ago=2
-        if: github.event.pull_request.head.repo.fork == false && (github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]')
+        if: github.event.pull_request.head.repo.fork == false && ('push' == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]')
         env:
           HOMEBREW_INFLUXDB_TOKEN: ${{ secrets.HOMEBREW_INFLUXDB_READ_TOKEN }}
 
       - run: brew generate-analytics-api
-        if: github.event.pull_request.head.repo.fork == false && (github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]')
+        if: github.event.pull_request.head.repo.fork == false && ('push' == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]')
         env:
           HOMEBREW_INFLUXDB_TOKEN: ${{ secrets.HOMEBREW_INFLUXDB_READ_TOKEN }}
