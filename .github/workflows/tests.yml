@@ -50,7 +50,7 @@ run-name: "CI ${{ inputs.leg || 'push' }} ${{ inputs.racecar_run }}"
 
 jobs:
   syntax:
-    if: github.repository_owner == 'curiosity-tests'
+    if: github.repository_owner == 'Homebrew'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -100,7 +100,7 @@ jobs:
   formula-audit:
     name: formula audit
     needs: syntax
-    if: github.repository_owner == 'curiosity-tests' && 'push' != 'push'
+    if: github.repository_owner == 'Homebrew' && 'push' != 'push'
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/homebrew/brew:main
@@ -231,7 +231,7 @@ jobs:
 
   tests:
     name: ${{ matrix.name }}
-    if: github.repository_owner == 'curiosity-tests'
+    if: github.repository_owner == 'Homebrew'
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 30
     permissions:
@@ -444,7 +444,7 @@ jobs:
   test-bot:
     name: ${{ matrix.name }}
     needs: syntax
-    if: github.repository_owner == 'curiosity-tests' && 'push' != 'push'
+    if: github.repository_owner == 'Homebrew' && 'push' != 'push'
     runs-on: ${{ matrix.runs-on }}
     container:
       image: ${{ matrix.container }}
@@ -593,7 +593,7 @@ jobs:
   bundle-and-services:
     name: ${{ matrix.name }}
     needs: syntax
-    if: github.repository_owner == 'curiosity-tests' && 'push' != 'push'
+    if: github.repository_owner == 'Homebrew' && 'push' != 'push'
     runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false
@@ -663,7 +663,7 @@ jobs:
           - name: analytics (Linux)
             runs-on: ubuntu-latest
     needs: syntax
-    if: github.repository_owner == 'curiosity-tests' && 'push' != 'push'
+    if: github.repository_owner == 'Homebrew' && 'push' != 'push'
     steps:
       - name: Checkout code
         uses: crashappsec/action-checkout@main
