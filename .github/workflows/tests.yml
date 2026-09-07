@@ -210,7 +210,12 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runs-on }}
     needs: syntax
-    if: ${{ 'push' != 'push' }}
+    # racecar: harness defect #7 (github.event_name constant-folded to 'push').
+    # Upstream is `github.event_name != 'push'` with NO identity clause, so the
+    # fold alone made this constant FALSE. Restoring the upstream expression is the
+    # whole fix -- no gate is relaxed. `brew update-test` simulates brew update in a
+    # scratch clone; it neither publishes nor consumes secrets.
+    if: ${{ github.event_name != 'push' }}
     strategy:
       fail-fast: false
       matrix:
