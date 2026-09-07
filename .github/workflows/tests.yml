@@ -50,7 +50,11 @@ run-name: "CI ${{ inputs.leg || 'push' }} ${{ inputs.racecar_run }}"
 
 jobs:
   syntax:
-    if: github.repository_owner == 'Homebrew'
+    # racecar: the upstream guard pins this to the Homebrew org, so on a fork it
+    # skips and the run reports success having executed nothing. Our fork owner is
+    # added as an ADDITIONAL allowed owner; the upstream clause stays. Neither
+    # `syntax` (brew style/typecheck) nor `tests` (brew tests) publishes or pushes.
+    if: github.repository_owner == 'Homebrew' || github.repository_owner == 'curiosity-tests'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -242,7 +246,11 @@ jobs:
 
   tests:
     name: ${{ matrix.name }}
-    if: github.repository_owner == 'Homebrew'
+    # racecar: the upstream guard pins this to the Homebrew org, so on a fork it
+    # skips and the run reports success having executed nothing. Our fork owner is
+    # added as an ADDITIONAL allowed owner; the upstream clause stays. Neither
+    # `syntax` (brew style/typecheck) nor `tests` (brew tests) publishes or pushes.
+    if: github.repository_owner == 'Homebrew' || github.repository_owner == 'curiosity-tests'
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 30
     permissions:
@@ -436,7 +444,9 @@ jobs:
           echo "filenames=${filenames%,}" >> "$GITHUB_OUTPUT"
 
       - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
-        if: matrix.load-only != true && ('push' == 'pull_request' || matrix.online != true)
+        # racecar: gated OFF on forks. CODECOV_TOKEN is an upstream secret and
+        # codecov-action hard-fails on an empty one.
+        if: github.repository_owner == 'Homebrew' && matrix.load-only != true && ('push' == 'pull_request' || matrix.online != true)
         with:
           working-directory: ${{ steps.set-up-homebrew.outputs.repository-path }}
           files: ${{ steps.junit_xml.outputs.filenames }}
@@ -445,7 +455,9 @@ jobs:
           report_type: test_results
 
       - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
-        if: matrix.load-only != true && ('push' == 'pull_request' || matrix.online != true)
+        # racecar: gated OFF on forks. CODECOV_TOKEN is an upstream secret and
+        # codecov-action hard-fails on an empty one.
+        if: github.repository_owner == 'Homebrew' && matrix.load-only != true && ('push' == 'pull_request' || matrix.online != true)
         with:
           working-directory: ${{ steps.set-up-homebrew.outputs.repository-path }}
           files: Library/Homebrew/test/coverage/coverage.xml
