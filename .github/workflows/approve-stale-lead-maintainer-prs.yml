@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - approve-stale-lead-maintainer-prs
-  schedule:
-    # Run every six hours on weekdays to find stale lead maintainer PRs.
-    - cron: "17 0,6,12,18 * * 1-5"
   workflow_dispatch:
     inputs:
       pull_request:

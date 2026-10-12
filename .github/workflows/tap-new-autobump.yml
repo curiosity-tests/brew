@@ -2,14 +2,12 @@
 name: tap-new autobump template
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - TAP_NEW_BRANCH
     paths:
       - .github/workflows/autobump.yml
-  schedule:
-    # this will be changed later and randomised by brew tap-new
-    - cron: "1 1 1 1 1"
 
 permissions: {}
 

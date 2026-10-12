@@ -2,14 +2,12 @@
 name: Manage stale issues and pull requests
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - .github/workflows/stale-issues-and-prs.yml
     branches-ignore:
       - dependabot/**
-  schedule:
-    # Once every day at midnight UTC
-    - cron: "0 0 * * *"
   issue_comment:
 
 permissions: {}
